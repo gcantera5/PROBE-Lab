@@ -1,3 +1,7 @@
+"""
+MATLAB Version
+
+"""
 data = readmatrix('[Insert File Path]');
 
 time     = data(:, 2);
