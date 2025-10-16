@@ -23,16 +23,8 @@ def compute_PI(peaks, troughs):
 # ---------------------------------
 
 # Replace with your actual file path (CSV or Excel)
-# data = pd.read_csv('Updated Channels Excel/YareliDataNewChannels.xlsx - Sheet1.csv', header=None)
 data = pd.read_csv('Updated Channels Excel/YareliDataNewChannels.xlsx - Sheet1.csv')
 data = data.apply(pd.to_numeric, errors='coerce')
-
-
-# time = data.iloc[:, 1].values
-# co655 = data.iloc[:, 2].values
-# co940 = data.iloc[:, 3].values
-# cross655 = data.iloc[:, 4].values
-# cross940 = data.iloc[:, 5].values
 
 time = data['time'].values
 cross940 = data['c16'].values
