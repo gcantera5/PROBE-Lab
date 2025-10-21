@@ -3,6 +3,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks, butter, filtfilt
 
+
+"""
+- calc mean for each interval
+- calc std for each interval
+- make a seperate file for each interval for each person 
+- focus in on smaller window frame for readings --> clearer view of graph gen
+"""
+
 # ---------------------------------
 # Helper Functions
 # ---------------------------------
@@ -43,55 +51,11 @@ Apply a 5 Hz low-pass filter with 50 Hz sampling to remove high-frequency noise 
 The Python helper uses scipy.signal.butter + filtfilt to replicate MATLAB's zero-phase lowpass()
 """
 
-# def process_channel(signal, fs, cutoff, prominence, distance, label, intervals):
-#     """Filter signal, find peaks/troughs, compute PI per interval, and plot."""
-#     isolated = lowpass_filter(signal, cutoff, fs)
-
-#     # Detect troughs (invert signal)
-#     troughs, locs_troughs = find_peaks(-isolated, prominence=prominence, distance=distance)
-#     # Detect peaks
-#     peaks, locs_peaks = find_peaks(isolated, prominence=prominence, distance=distance)
-
-#     results = []
-#     # for idx_list, interval_label in intervals:
-#     #     idx_list = np.array(idx_list)
-#     #     sel_troughs = troughs[idx_list]
-#     #     sel_locs_troughs = locs_troughs[idx_list]
-#     #     sel_peaks = peaks[idx_list]
-#     #     PI = compute_PI(sel_peaks, sel_troughs)
-#     #     results.append(PI)
-
-#     for idx_list, interval_label in intervals:
-#         idx_list = np.asarray(idx_list, dtype=int).flatten()
-#         sel_troughs = troughs[idx_list.tolist()]
-#         sel_locs_troughs = locs_troughs[idx_list.tolist()]
-#         sel_peaks = peaks[idx_list.tolist()]
-
-#         # Plot QC waveform
-#         plt.figure(figsize=(10, 4))
-#         plt.plot(time, isolated, label=f"{label} Filtered")
-#         plt.plot(time[sel_locs_troughs], -sel_troughs, "x", label="Troughs")
-#         plt.plot(time[locs_peaks[idx_list]], sel_peaks, "o", label="Peaks")
-#         plt.title(f"{label}: {interval_label}")
-#         plt.xlabel("Time (s)")
-#         plt.ylabel("Filtered Signal")
-#         plt.legend()
-#         plt.tight_layout()
-#         plt.show()
-
-#     # Combine all intervals
-#     all_PI = np.concatenate(results)
-#     mean_PI = np.mean(all_PI)
-#     std_PI = np.std(all_PI)
-#     print(f"{label} — Mean PI: {mean_PI:.3f}, Std PI: {std_PI:.3f}")
-
-#     return results, mean_PI, std_PI
-
 def process_channel(signal, fs, cutoff, prominence, distance, label, intervals):
     """Filter signal, find peaks/troughs, compute PI per interval, and plot (MATLAB-style)."""
     isolated = lowpass_filter(signal, cutoff, fs)
 
-    # MATLAB equivalent
+    # MATLAB equivalent to detect troughs (invert signal)
     locs_troughs, _ = find_peaks(-isolated, prominence=prominence, distance=distance)
     locs_peaks, _ = find_peaks(isolated, prominence=prominence, distance=distance)
 
@@ -178,24 +142,6 @@ plt.legend()
 plt.grid(True)
 plt.tight_layout()
 plt.show()
-
-# plt.figure(figsize=(8, 6))
-# plt.step(time[intervals[2][0]], np.concatenate(cross940_results), where='mid', label="940 Cross PI", color='r')
-# plt.step(time[intervals[2][0]], np.concatenate(cross655_results), where='mid', label="655 Cross PI", color='b')
-# plt.step(time[intervals[2][0]], np.concatenate(co940_results), where='mid', label="940 Co PI", color='m')
-# plt.step(time[intervals[2][0]], np.concatenate(co655_results), where='mid', label="655 Co PI", color='k')
-
-# plt.xlim([180, 190])
-# plt.ylim([0, 4])
-# plt.xlabel("Time (s)")
-# plt.ylabel("Perfusion Index")
-# plt.title("Perfusion Index Across Channels (Interval 3 Example)")
-# plt.legend()
-# plt.grid(True)
-# plt.tight_layout()
-# plt.show()
-
-
 
 
 # ---------------------------------
