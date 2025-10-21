@@ -86,6 +86,16 @@ def process_channel(signal, fs, cutoff, prominence, distance, label, intervals):
         plt.plot(time, isolated, label=f"{label} Filtered")
         plt.plot(time[sel_locs_troughs], -sel_troughs, "x", label="Troughs")
         plt.plot(time[locs_peaks[idx_array]], sel_peaks, "o", label="Peaks")
+
+        # --- Zoom in to the region of interest ---
+        # Get time range for the current interval
+        t_min = time[sel_locs_troughs[0]] - 2   # small margin
+        t_max = time[sel_locs_troughs[-1]] + 2
+        plt.xlim([t_min, t_max])
+
+        segment = isolated[sel_locs_troughs[0]-50 : sel_locs_troughs[-1]+50]
+        plt.ylim([np.min(segment) - 500, np.max(segment) + 500])
+
         plt.title(f"{label}: {interval_label}")
         plt.xlabel("Time (s)")
         plt.ylabel("Filtered Signal")
