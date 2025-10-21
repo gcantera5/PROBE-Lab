@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks, butter, filtfilt
+import os
 
 
 """
@@ -101,6 +102,23 @@ def process_channel(signal, fs, cutoff, prominence, distance, label, intervals):
         plt.ylabel("Filtered Signal")
         plt.legend()
         plt.tight_layout()
+        #plt.show()
+
+        # --- Define output directory ---
+        output_dir = "Generated_Plots"
+        os.makedirs(output_dir, exist_ok=True)  # create folder if not exists
+
+        # --- Generate unique filename for each channel/interval ---
+        filename = f"{label.replace(' ', '_')}_{interval_label.replace(' ', '_').replace('(', '').replace(')', '').replace('–','-')}.png"
+        save_path = os.path.join(output_dir, filename)
+
+        # --- Save only if file doesn't already exist ---
+        if not os.path.exists(save_path):
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Saved plot: {save_path}")
+        else:
+            print(f"Skipped (already exists): {save_path}")
+        
         plt.show()
 
     # Combine all intervals (replicates MATLAB concatenation + mean/std)
