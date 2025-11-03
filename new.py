@@ -6,10 +6,9 @@ import os
 
 
 """
-- calc mean for each interval
-- calc std for each interval
-- make a seperate file for each interval for each person 
-- focus in on smaller window frame for readings --> clearer view of graph gen
+- do CVS pipeline for mean and std data 
+- have the data saved seperately for stat analysis
+- reach out to yareli and rutendo for lab field data 
 """
 
 # ---------------------------------
@@ -32,8 +31,19 @@ def compute_PI(peaks, troughs):
 # ---------------------------------
 
 # Replace with your actual file path (CSV or Excel)
-data = pd.read_csv('Updated Channels Excel/YareliDataNewChannels.xlsx - Sheet1.csv')
+file_path = 'Updated Channels Excel/YareliDataNewChannels.xlsx - Sheet1.csv'
+data = pd.read_csv(file_path)
 data = data.apply(pd.to_numeric, errors='coerce')
+
+# Extract participant name based on filename convention 
+# (e.g., ___iDataNewChannels.xlsx)
+base_name = os.path.basename(file_path)
+
+# Extract Name on file
+participant_name = base_name.split("DataNewChannels")[0]  # Extract 
+participant_name = participant_name.replace(" ", "").strip()
+
+print(f"Processing data for participant: {participant_name}")
 
 time = data['time'].values
 cross940 = data['c16'].values
@@ -105,7 +115,7 @@ def process_channel(signal, fs, cutoff, prominence, distance, label, intervals):
         #plt.show()
 
         # --- Define output directory ---
-        output_dir = "Generated_Plots"
+        output_dir = os.path.join("Generated_Plots", participant_name)
         os.makedirs(output_dir, exist_ok=True)  # create folder if not exists
 
         # --- Generate unique filename for each channel/interval ---
@@ -150,6 +160,35 @@ cross940_results, mean_940cr, std_940cr = process_channel(cross940, fs, cutoff, 
 cross655_results, mean_655cr, std_655cr = process_channel(cross655, fs, cutoff, 18, 10, "655 Cross", intervals)
 co940_results, mean_940co, std_940co = process_channel(co940, fs, cutoff, 40, 8, "940 Co", intervals)
 co655_results, mean_655co, std_655co = process_channel(co655, fs, cutoff, 70, 11, "655 Co", intervals)
+
+
+
+# ---------------------------------
+# Save Participant Summary (Mean + Std)
+# ---------------------------------
+
+summary_data = {
+    "Participant": [participant_name],
+    "940 Cross Mean": [mean_940cr], "940 Cross Std": [std_940cr],
+    "655 Cross Mean": [mean_655cr], "655 Cross Std": [std_655cr],
+    "940 Co Mean": [mean_940co], "940 Co Std": [std_940co],
+    "655 Co Mean": [mean_655co], "655 Co Std": [std_655co],
+}
+
+summary_df = pd.DataFrame(summary_data)
+
+# Save in the same participant folder under Generated_Plots
+summary_path = os.path.join("Generated_Plots", participant_name, "summary.csv")
+
+# create CVS for statistical analysis
+if os.path.exists(summary_path):
+    existing_df = pd.read_csv(summary_path)
+    updated_df = pd.concat([existing_df, summary_df], ignore_index=True)
+    updated_df.to_csv(summary_path, index=False)
+    print(f"Updated summary CSV: {summary_path}")
+else:
+    summary_df.to_csv(summary_path, index=False)
+    print(f"Saved new summary CSV: {summary_path}")
 
 # ---------------------------------
 # Plot Comparison (PI Across Channels)
