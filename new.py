@@ -8,7 +8,8 @@ import os
 """
 - do CVS pipeline for mean and std data 
 - have the data saved seperately for stat analysis
-- reach out to yareli and rutendo for lab field data 
+- lab field data??? 
+- rewrite names to be participant #s -- no ID check
 """
 
 # ---------------------------------
@@ -31,7 +32,7 @@ def compute_PI(peaks, troughs):
 # ---------------------------------
 
 # Replace with your actual file path (CSV or Excel)
-file_path = 'Updated Channels Excel/YareliDataNewChannels.xlsx - Sheet1.csv'
+file_path = 'Updated Channels Excel/JuliaDataNewChannels.xlsx - Sheet1.csv'
 data = pd.read_csv(file_path)
 data = data.apply(pd.to_numeric, errors='coerce')
 
