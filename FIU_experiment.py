@@ -66,9 +66,6 @@ def process_signal(signal, fs=50, cutoff=5, prominence=25, distance=10):
     PI = compute_PI(peaks[:min_len], troughs[:min_len])
     return np.mean(PI), np.std(PI)
 
-# ---------------------------------
-# LOAD & CLEAN JSON DATA
-# ---------------------------------
 
 # ---------------------------------
 # LOAD & CLEAN JSON DATA
@@ -118,7 +115,11 @@ def load_and_clean_json(json_path, condition_info):
         cleaned_df[key] = val
 
     # --- Create folder structure ---
-    participant_folder = os.path.join("FIU_Cleaned_Data", condition_info["SkinTone"])
+    participant_folder = os.path.join(
+        "FIU_Cleaned_Data",
+        condition_info["SkinTone"],
+        condition_info["Experiment"])
+
     os.makedirs(participant_folder, exist_ok=True)
 
     # --- Save cleaned CSV ---
@@ -143,6 +144,7 @@ def load_and_clean_json(json_path, condition_info):
                 "SkinTone": condition_info["SkinTone"],
                 "Speed": condition_info["Speed"],
                 "Depth": condition_info["Depth"],
+                "Experiment": condition_info["Experiment"]
             })
 
     summary_df = pd.DataFrame(summary_rows)
@@ -153,16 +155,13 @@ def load_and_clean_json(json_path, condition_info):
 
     if os.path.exists(summary_path) and os.path.getsize(summary_path) > 0:
         existing = pd.read_csv(summary_path)
-
-        # Remove any rows from the same participant before appending new results
+        # Remove duplicate participant entries before appending
         existing = existing[existing["Participant"] != base_name]
-
         updated = pd.concat([existing, summary_df], ignore_index=True)
-        updated.to_csv(summary_path, index=False)
         print(f"Updated (no duplicates): {summary_path}")
-
     else:
-        summary_df.to_csv(summary_path, index=False)
+        # Always define 'updated' even when creating a new summary
+        updated = summary_df.copy()
         print(f"Created new summary: {summary_path}")
 
 
@@ -178,8 +177,8 @@ def load_and_clean_json(json_path, condition_info):
 
     # Reorder columns for cleaner CSV organization
     ordered_cols = [
-        "Participant", "Channel", "Hardware Channel",
-        "Mean PI", "Std PI", "SkinTone", "Speed", "Depth"
+    "Participant", "Channel", "Hardware Channel",
+    "Mean PI", "Std PI", "SkinTone", "Speed", "Depth", "Experiment"
     ]
 
     updated = updated[ordered_cols]
@@ -197,18 +196,58 @@ def load_and_clean_json(json_path, condition_info):
     print(f"\n Summary updated for {base_name}\n")
 
 # ---------------------------------
-# Run single JSON file
+# Run JSON files Day 1 experiment
 # ---------------------------------
 
-# Path to your single experiment JSON
-json_path = "Experiment 1 (Day 1)  copy/Fast Fair 2.5.json"
+# # Path to your single experiment JSON
+# json_path = "Experiment 1 (Day 1)  copy/Fast Fair 2.5.json"
 
-# Define experimental condition info manually
-condition_info = {
-    "SkinTone": "Fair",
-    "Speed": "Fast",
-    "Depth": "2.5mm"
-}
+# # Define experimental condition info manually
+# condition_info = {
+#     "SkinTone": "Fair",
+#     "Speed": "Fast",
+#     "Depth": "2.5mm"
+# }
+
+data_folder = "Experiment 1 (Day 1)  copy"
+
+# Include only unzipped .json files (ignore .gz and .zip)
+json_files = [
+    f for f in glob.glob(os.path.join(data_folder, "*.json"))
+    if not f.endswith((".json.gz", ".json.zip"))
+]
+
+for json_path in json_files:
+    filename = os.path.basename(json_path).replace(".json", "")
+
+    # Detect if this is a repeated experiment (contains "(2)")
+    if "(2)" in filename:
+        experiment_num = "2"
+        clean_name = filename.replace("(2)", "").strip()
+    else:
+        experiment_num = "1"
+        clean_name = filename.strip()
+
+    # Clean and split name
+    clean_name = clean_name.replace("_", " ")
+    parts = clean_name.split()
+
+    if len(parts) >= 3:
+        speed = parts[0].capitalize()
+        skin = parts[1].capitalize()
+        depth = parts[2] + "mm"
+
+        condition_info = {
+            "SkinTone": skin,
+            "Speed": speed,
+            "Depth": depth,
+            "Experiment": f"Experiment_{experiment_num}"
+        }
+
+        print(f"\n Processing file: {filename} → {condition_info}")
+        load_and_clean_json(json_path, condition_info)
+
+
 
 # add bulk data collection to extract skintone, speed, depth, manually via file naming convention
 
@@ -217,4 +256,4 @@ condition_info = {
 # show visually to prove ppg
 
 # Process it directly
-load_and_clean_json(json_path, condition_info)
+#
