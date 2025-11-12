@@ -32,9 +32,32 @@ def compute_PI(peaks, troughs):
     PI = -(AC / troughs) * 100
     return PI
 
-def process_signal(signal, fs=50, cutoff=5, prominence=25, distance=10):
+def process_signal(signal, fs=50, cutoff=5, prominence=25, distance=10, label="", condition_info=None):
     """Filter, detect peaks/troughs, compute PI mean/std."""
     isolated = lowpass_filter(signal, cutoff, fs)
+
+    # Extract just the channel (e.g. C5, C10)
+    graph_channel = "N/A"
+    for pol, mapping in CHANNEL_MAP.items():
+        for color, ch in mapping.items():
+            if f"{pol}_{color}" == label:
+                graph_channel = ch.upper()
+
+
+    # --- VISUALIZE THE FILTERED PPG SIGNAL ---
+
+
+    if condition_info:
+        full_label = f"{condition_info['SkinTone']} | {condition_info['Experiment']} | {condition_info['Speed']} | {condition_info['Depth']} | {graph_channel}"
+
+    plt.figure(figsize=(8, 4))
+    plt.plot(isolated, color='#7289A7', linewidth=1.2)
+    plt.title(full_label)
+    plt.xlabel("Sample index")
+    plt.ylabel("Filtered amplitude")
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.show()
 
     """
     The PPG signal was inverted along the y-axis because photodiodes produce 
@@ -63,8 +86,11 @@ def process_signal(signal, fs=50, cutoff=5, prominence=25, distance=10):
     if min_len == 0:
         return np.nan, np.nan  # no valid peaks/troughs
 
+
     PI = compute_PI(peaks[:min_len], troughs[:min_len])
     return np.mean(PI), np.std(PI)
+    
+
 
 
 # ---------------------------------
@@ -135,7 +161,7 @@ def load_and_clean_json(json_path, condition_info):
 
     for col in cleaned_df.columns:
         if any(pol in col for pol in ["Unpolarized_A", "Unpolarized_B", "Co-Polarized", "Cross-Polarized"]):
-            mean_PI, std_PI = process_signal(cleaned_df[col].values, fs)
+            mean_PI, std_PI = process_signal(cleaned_df[col].values, fs, label=col, condition_info=condition_info)
             summary_rows.append({
                 "Participant": base_name,
                 "Channel": col,
@@ -198,16 +224,6 @@ def load_and_clean_json(json_path, condition_info):
 # ---------------------------------
 # Run JSON files Day 1 experiment
 # ---------------------------------
-
-# # Path to your single experiment JSON
-# json_path = "Experiment 1 (Day 1)  copy/Fast Fair 2.5.json"
-
-# # Define experimental condition info manually
-# condition_info = {
-#     "SkinTone": "Fair",
-#     "Speed": "Fast",
-#     "Depth": "2.5mm"
-# }
 
 data_folder = "Experiment 1 (Day 1)  copy"
 
