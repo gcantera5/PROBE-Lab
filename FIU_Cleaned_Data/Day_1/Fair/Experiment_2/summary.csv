@@ -1,0 +1,25 @@
+Participant,Channel,Hardware Channel,Mean PI,Std PI,SkinTone,Speed,Depth,Experiment
+Fair_Medium_2.5mm,Unpolarized_A_Green,C5,2.097634708151208,1.7122522551388342,Fair,Medium,2.5mm,Experiment_2
+Fair_Medium_2.5mm,Unpolarized_A_Red,C2,1.6889907582095307,0.3366221673070847,Fair,Medium,2.5mm,Experiment_2
+Fair_Medium_2.5mm,Unpolarized_A_IR,C4,1.2825410898024778,0.1818870070078569,Fair,Medium,2.5mm,Experiment_2
+Fair_Medium_2.5mm,Unpolarized_B_Green,C11,1.0449622739447295,0.7002658924285864,Fair,Medium,2.5mm,Experiment_2
+Fair_Medium_2.5mm,Unpolarized_B_Red,C8,0.5258022727342972,0.2040020016523782,Fair,Medium,2.5mm,Experiment_2
+Fair_Medium_2.5mm,Unpolarized_B_IR,C10,0.2086878238275807,0.0512467874613395,Fair,Medium,2.5mm,Experiment_2
+Fair_Medium_2.5mm,Co-Polarized_Green,C13,3.656962406512805,0.8420386825426335,Fair,Medium,2.5mm,Experiment_2
+Fair_Medium_2.5mm,Co-Polarized_Red,C12,3.4609681735062803,0.6005365130442535,Fair,Medium,2.5mm,Experiment_2
+Fair_Medium_2.5mm,Co-Polarized_IR,C15,4.242261036375162,0.4297812999859952,Fair,Medium,2.5mm,Experiment_2
+Fair_Medium_2.5mm,Cross-Polarized_Green,C19,20.195604370419687,1.5341163879558588,Fair,Medium,2.5mm,Experiment_2
+Fair_Medium_2.5mm,Cross-Polarized_Red,C18,20.074788414729923,1.610157286174314,Fair,Medium,2.5mm,Experiment_2
+Fair_Medium_2.5mm,Cross-Polarized_IR,C21,11.818338213356418,0.9124481253372124,Fair,Medium,2.5mm,Experiment_2
+Fair_Fast_2.5mm,Unpolarized_A_Green,C5,2.310088970287132,4.278188584790966,Fair,Fast,2.5mm,Experiment_2
+Fair_Fast_2.5mm,Unpolarized_A_Red,C2,1.5495419406025386,2.4315844814702827,Fair,Fast,2.5mm,Experiment_2
+Fair_Fast_2.5mm,Unpolarized_A_IR,C4,0.9988508987295014,0.36095215738803776,Fair,Fast,2.5mm,Experiment_2
+Fair_Fast_2.5mm,Unpolarized_B_Green,C11,1.090167094777353,0.969435019684886,Fair,Fast,2.5mm,Experiment_2
+Fair_Fast_2.5mm,Unpolarized_B_Red,C8,0.6558367427525491,0.8699415593978407,Fair,Fast,2.5mm,Experiment_2
+Fair_Fast_2.5mm,Unpolarized_B_IR,C10,0.20888665361082395,0.18345711803254156,Fair,Fast,2.5mm,Experiment_2
+Fair_Fast_2.5mm,Co-Polarized_Green,C13,3.493900814710735,7.33512567976386,Fair,Fast,2.5mm,Experiment_2
+Fair_Fast_2.5mm,Co-Polarized_Red,C12,3.1891014203156725,5.220189356649851,Fair,Fast,2.5mm,Experiment_2
+Fair_Fast_2.5mm,Co-Polarized_IR,C15,3.214801456270021,1.6593851058540585,Fair,Fast,2.5mm,Experiment_2
+Fair_Fast_2.5mm,Cross-Polarized_Green,C19,14.044617842796061,2.273094666283265,Fair,Fast,2.5mm,Experiment_2
+Fair_Fast_2.5mm,Cross-Polarized_Red,C18,14.134434545219193,1.9799028138063686,Fair,Fast,2.5mm,Experiment_2
+Fair_Fast_2.5mm,Cross-Polarized_IR,C21,8.479294843634635,1.1296397431980396,Fair,Fast,2.5mm,Experiment_2

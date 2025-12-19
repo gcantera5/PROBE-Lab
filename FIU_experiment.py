@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt, find_peaks
 import os
 import glob
+import gzip
+import shutil
 
 # ---------------------------------
 # CHANNEL MAP 
@@ -20,6 +22,15 @@ CHANNEL_MAP = {
 # ---------------------------------
 # SIGNAL PROCESSING HELPERS
 # ---------------------------------
+
+def unzip_file(filepath):
+    if filepath.endswith(".gz"):
+        new_path = filepath[:-3]
+        with gzip.open(filepath, "rb") as f_in:
+            with open(new_path, "wb") as f_out:
+                shutil.copyfileobj(f_in, f_out)
+        return new_path
+    return filepath
 
 def lowpass_filter(signal, cutoff_hz, fs, order=4):
     """Zero-phase low-pass filter to remove high-frequency noise."""
@@ -44,11 +55,25 @@ def process_signal(signal, fs=50, cutoff=5, prominence=25, distance=10, label=""
                 graph_channel = ch.upper()
 
 
-    # --- VISUALIZE THE FILTERED PPG SIGNAL ---
+    # # --- VISUALIZE THE FILTERED PPG SIGNAL ---
 
 
-    if condition_info:
-        full_label = f"{condition_info['SkinTone']} | {condition_info['Experiment']} | {condition_info['Speed']} | {condition_info['Depth']} | {graph_channel}"
+    # if condition_info:
+    #     full_label = f"{condition_info['SkinTone']} | {condition_info['Experiment']} | {condition_info['Speed']} | {condition_info['Depth']} | {graph_channel}"
+
+    # Extract hardware channel (ex: C5)
+
+    # channel_num = label.split("_")[-1].upper()
+
+    full_label = (
+        f"{condition_info['SkinTone']} | "
+        f"{condition_info['Day']} | "
+        f"{condition_info['Experiment']} | "
+        f"{condition_info['Speed']} | "
+        f"{condition_info['Depth']} | "
+        f"{graph_channel}"
+    )
+
 
     plt.figure(figsize=(8, 4))
     plt.plot(isolated, color='#7289A7', linewidth=1.2)
@@ -99,6 +124,8 @@ def process_signal(signal, fs=50, cutoff=5, prominence=25, distance=10, label=""
 def load_and_clean_json(json_path, condition_info):
     """Load FIU experiment JSON file, flatten nested fields, and clean it."""
 
+    json_path = unzip_file(json_path)
+
     # --- Load JSON file ---
     with open(json_path, "r") as f:
         data = json.load(f)
@@ -143,8 +170,10 @@ def load_and_clean_json(json_path, condition_info):
     # --- Create folder structure ---
     participant_folder = os.path.join(
         "FIU_Cleaned_Data",
+        condition_info["Day"],
         condition_info["SkinTone"],
-        condition_info["Experiment"])
+        condition_info["Experiment"]
+    )
 
     os.makedirs(participant_folder, exist_ok=True)
 
@@ -167,11 +196,13 @@ def load_and_clean_json(json_path, condition_info):
                 "Channel": col,
                 "Mean PI": mean_PI,
                 "Std PI": std_PI,
-                "SkinTone": condition_info["SkinTone"],
-                "Speed": condition_info["Speed"],
-                "Depth": condition_info["Depth"],
-                "Experiment": condition_info["Experiment"]
+                **condition_info
+                # "SkinTone": condition_info["SkinTone"],
+                # "Speed": condition_info["Speed"],
+                # "Depth": condition_info["Depth"],
+                # "Experiment": condition_info["Experiment"]
             })
+
 
     summary_df = pd.DataFrame(summary_rows)
 
@@ -253,23 +284,64 @@ for json_path in json_files:
         skin = parts[1].capitalize()
         depth = parts[2] + "mm"
 
+        # condition_info = {
+        #     "SkinTone": skin,
+        #     "Speed": speed,
+        #     "Depth": depth,
+        #     "Experiment": f"Experiment_{experiment_num}"
+        # }
+
         condition_info = {
+            "Day": "Day_1",
             "SkinTone": skin,
             "Speed": speed,
             "Depth": depth,
             "Experiment": f"Experiment_{experiment_num}"
         }
 
+
         print(f"\n Processing file: {filename} → {condition_info}")
         load_and_clean_json(json_path, condition_info)
 
+# ---------------------------------
+# Day 2 experiment
+# ---------------------------------
+
+day2_root = "Experiment 1 Complete  copy"
+day2_folders = [d for d in glob.glob(os.path.join(day2_root, "*")) if os.path.isdir(d)]
+
+for folder in day2_folders:
+
+    folder_name = os.path.basename(folder)
+    parts = folder_name.split()
+
+    depth = parts[0] + "mm"
+    skin = parts[1]
+    speed = parts[2]
+
+    condition_info = {
+        "Day": "Day_2",
+        "SkinTone": skin.capitalize(),
+        "Speed": speed.capitalize(),
+        "Depth": depth,
+        "Experiment": "Experiment_2"
+    }
+
+    json_files = glob.glob(os.path.join(folder, "*.json*"))
+
+    for json_path in json_files:
+        load_and_clean_json(json_path, condition_info)
+
+"""
+plot a good 10 second window window for each file experiment -- COMPLETE DAY 1
+
+apply notch filter -- will help with viewing graphs
+
+label trial instead of experiment 1 or 2
 
 
-# add bulk data collection to extract skintone, speed, depth, manually via file naming convention
+get peak and troughs for each subsequent experiment per day
 
-# we want to confirm if we have ppg 
+Rutendo -- fft code implementation
 
-# show visually to prove ppg
-
-# Process it directly
-#
+"""
