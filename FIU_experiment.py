@@ -79,21 +79,42 @@ def process_signal(signal, fs=50, cutoff=5, prominence=25, distance=10, label=""
 
     # channel_num = label.split("_")[-1].upper()
 
-    full_label = (
-        f"{condition_info['SkinTone']} | "
-        f"{condition_info['Day']} | "
-        f"{condition_info['Experiment']} | "
-        f"{condition_info['Speed']} | "
-        f"{condition_info['Depth']} | "
-        f"{graph_channel}"
-    )
+    # full_label = (
+    #     f"{condition_info['SkinTone']} | "
+    #     f"{condition_info['Day']} | "
+    #     f"{condition_info['Experiment']} | "
+    #     f"{condition_info['Speed']} | "
+    #     f"{condition_info['Depth']} | "
+    #     f"{graph_channel}"
+    # )
+
+    parts = [
+        condition_info.get("SkinTone") if condition_info else None,
+        condition_info.get("Day") if condition_info else None,
+        condition_info.get("Experiment") if condition_info else None,
+        condition_info.get("Speed") if condition_info else None,
+        condition_info.get("Depth") if condition_info else None,
+        condition_info.get("Wavelength") if condition_info else None,
+        condition_info.get("PolCondition") if condition_info else None,
+        condition_info.get("Session") if condition_info else None,
+        condition_info.get("Condition") if condition_info else None,
+        graph_channel
+    ]
+
+    full_label = " | ".join([p for p in parts if p])
 
     # Create plot folder
+    # plot_dir = os.path.join(
+    #     "FIU_Plots",
+    #     condition_info["Day"],
+    #     condition_info["Experiment"]
+    # )
     plot_dir = os.path.join(
         "FIU_Plots",
         condition_info["Day"],
-        condition_info["Experiment"]
+        condition_info.get("Experiment", condition_info.get("Condition"))
     )
+
     os.makedirs(plot_dir, exist_ok=True)
 
     # Safe filename
@@ -110,15 +131,6 @@ def process_signal(signal, fs=50, cutoff=5, prominence=25, distance=10, label=""
     plt.tight_layout()
     plt.savefig(plot_path, dpi=300)
     plt.close()
-
-    # plt.figure(figsize=(8, 4))
-    # plt.plot(isolated, color='#7289A7', linewidth=1.2)
-    # plt.title(full_label)
-    # plt.xlabel("Sample index")
-    # plt.ylabel("Filtered amplitude")
-    # plt.grid(True, linestyle="--", alpha=0.5)
-    # plt.tight_layout()
-    # plt.show()
 
     """
     The PPG signal was inverted along the y-axis because photodiodes produce 
@@ -151,8 +163,6 @@ def process_signal(signal, fs=50, cutoff=5, prominence=25, distance=10, label=""
     PI = compute_PI(peaks[:min_len], troughs[:min_len])
     return np.mean(PI), np.std(PI)
     
-
-
 
 # ---------------------------------
 # LOAD & CLEAN JSON DATA
@@ -207,6 +217,7 @@ def load_and_clean_json(json_path, condition_info, mode="ppg"):
 
     if condition_info.get("Day") == "Day_3":
         condition = condition_info.get("Condition", "Calibration")
+        condition = condition.strip().replace(" ", "_")
         participant_folder = os.path.join("FIU_Cleaned_Data", "Day_3", "Calibration", condition)
         base_name = condition  # keep name simple for blackout
     else:
@@ -225,14 +236,6 @@ def load_and_clean_json(json_path, condition_info, mode="ppg"):
     print(f"Cleaned data saved: {out_path}")
 
 
-    # participant_folder = os.path.join(
-    #     "FIU_Cleaned_Data",
-    #     condition_info["Day"],
-    #     condition_info["SkinTone"],
-    #     condition_info["Experiment"]
-    # )
-
-    # os.makedirs(participant_folder, exist_ok=True)
 
     # # --- Save cleaned CSV ---
     # base_name = f"{condition_info['SkinTone']}_{condition_info['Speed']}_{condition_info['Depth']}"
@@ -275,22 +278,6 @@ def load_and_clean_json(json_path, condition_info, mode="ppg"):
                 })
 
 
-    # for col in cleaned_df.columns:
-    #     if any(pol in col for pol in ["Unpolarized_A", "Unpolarized_B", "Co-Polarized", "Cross-Polarized"]):
-    #         mean_PI, std_PI = process_signal(cleaned_df[col].values, fs, label=col, condition_info=condition_info)
-    #         summary_rows.append({
-    #             "Participant": base_name,
-    #             "Channel": col,
-    #             "Mean PI": mean_PI,
-    #             "Std PI": std_PI,
-    #             **condition_info
-    #             # "SkinTone": condition_info["SkinTone"],
-    #             # "Speed": condition_info["Speed"],
-    #             # "Depth": condition_info["Depth"],
-    #             # "Experiment": condition_info["Experiment"]
-    #         })
-
-
     summary_df = pd.DataFrame(summary_rows)
 
     # --- Save or append summary CSV ---
@@ -321,8 +308,8 @@ def load_and_clean_json(json_path, condition_info, mode="ppg"):
 
     # Reorder columns for cleaner CSV organization
     ordered_cols = [
-    "Participant", "Channel", "Hardware Channel",
-    "Mean PI", "Std PI"
+        "Participant", "Channel", "Hardware Channel",
+        "Metric", "Mean", "Std"
     ] + list(condition_info.keys())
 
     ordered_cols = [c for c in ordered_cols if c in updated.columns]
@@ -418,8 +405,8 @@ for folder in day2_folders:
         "Experiment": "Experiment_2"
     }
 
+    # unzip_file() will make sure it's only unzipped once.
     json_files = glob.glob(os.path.join(folder, "*.json*"))
-
     for json_path in json_files:
         load_and_clean_json(json_path, condition_info)
 
@@ -438,24 +425,52 @@ peak-based metrics such as perfusion index were not the primary outcome for thes
 """
 
 day3_root = "Experiment 2 Test (Day 3) copy"
+
+# ---- Blackout Offset ----
 blackout_folder = os.path.join(day3_root, "Calibration", "Blackout Offset")
 
-# 1) unzip all .json.gz once
+# unzip once
 gz_files = glob.glob(os.path.join(blackout_folder, "*.json.gz"))
 for gz_path in gz_files:
     unzip_file(gz_path)
 
-# 2) process ONLY unzipped .json (ignores .json.gz)
-json_files = glob.glob(os.path.join(blackout_folder, "*.json"))
+# process ONLY unzipped .json (ignores .json.gz)
+json_files = [
+    f for f in glob.glob(os.path.join(blackout_folder, "*.json*"))
+    if f.endswith(".json")
+]
 
 condition_info = {
     "Day": "Day_3",
-    "Condition": "Blackout Offset"
+    "Condition": "Blackout_Offset"
 }
 
 for json_path in json_files:
     load_and_clean_json(json_path, condition_info, mode="baseline")
 
+# ---- Red Light Pol. Switched (Sessions) ----
+switched_root = os.path.join(day3_root, "Calibration", "Red Light Pol. Switched")
+session_folders = [d for d in glob.glob(os.path.join(switched_root, "*")) if os.path.isdir(d)]
+
+for sess in session_folders:
+    sess_name = os.path.basename(sess)  # ex: "Session 1"
+
+    # unzip once
+    gz_files = glob.glob(os.path.join(sess, "*.json.gz"))
+    for gz_path in gz_files:
+        unzip_file(gz_path)
+
+    # process only unzipped .json
+    json_files = glob.glob(os.path.join(sess, "*.json"))
+
+    condition_info = {
+        "Day": "Day_3",
+        "Condition": "RedLightPol_Switched",
+        "Session": sess_name.replace(" ", "_")
+    }
+
+    for json_path in json_files:
+        load_and_clean_json(json_path, condition_info, mode="baseline")
 
 """
 plot a good 10 second window window for each file experiment -- COMPLETE DAY 1
