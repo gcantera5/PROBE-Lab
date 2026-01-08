@@ -214,12 +214,33 @@ def load_and_clean_json(json_path, condition_info, mode="ppg"):
         cleaned_df[key] = val
 
     # --- Create folder structure ---
+    day = condition_info.get("Day", "UnknownDay")
 
-    if condition_info.get("Day") == "Day_3":
+    if day == "Day_3":
         condition = condition_info.get("Condition", "Calibration")
-        condition = condition.strip().replace(" ", "_")
         participant_folder = os.path.join("FIU_Cleaned_Data", "Day_3", "Calibration", condition)
-        base_name = condition  # keep name simple for blackout
+        base_name = condition
+
+    # if condition_info.get("Day") == "Day_3":
+    #     condition = condition_info.get("Condition", "Calibration")
+    #     condition = condition.strip().replace(" ", "_")
+    #     participant_folder = os.path.join("FIU_Cleaned_Data", "Day_3", "Calibration", condition)
+    #     base_name = condition  # keep name simple for blackout
+
+    elif day == "Day_4":
+        # Day 4 (Experiment 2 & 3) metadata comes from folder names, not Speed/Depth
+        exp = condition_info.get("Experiment", "UnknownExperiment")
+        wl = condition_info.get("Wavelength", "UnknownWavelength")
+        skin = condition_info.get("SkinTone", "UnknownSkin")
+        orient = str(condition_info.get("Orientation", "UnknownOrientation"))
+        pol = condition_info.get("Pol", "UnknownPol")
+
+        participant_folder = os.path.join(
+            "FIU_Cleaned_Data", "Day_4", exp,
+            wl, skin, f"{orient}deg", pol.replace(" ", "").replace(".", "")
+        )
+        base_name = f"{wl}_{skin}_{orient}_{pol}".replace(" ", "").replace(".", "")
+
     else:
         participant_folder = os.path.join(
             "FIU_Cleaned_Data",
@@ -229,20 +250,20 @@ def load_and_clean_json(json_path, condition_info, mode="ppg"):
         )
         base_name = f"{condition_info['SkinTone']}_{condition_info['Speed']}_{condition_info['Depth']}"
 
+    out_path = os.path.join(participant_folder, f"{base_name}.csv")
+
     os.makedirs(participant_folder, exist_ok=True)
 
-    out_path = os.path.join(participant_folder, f"{base_name}.csv")
+    # --------------------------------------------------
+    # SKIP if this file was already processed
+    # --------------------------------------------------
+    if os.path.exists(out_path):
+        print(f"Skipping (already cleaned): {out_path}")
+        return
+
+    #out_path = os.path.join(participant_folder, f"{base_name}.csv")
     cleaned_df.to_csv(out_path, index=False)
     print(f"Cleaned data saved: {out_path}")
-
-
-
-    # # --- Save cleaned CSV ---
-    # base_name = f"{condition_info['SkinTone']}_{condition_info['Speed']}_{condition_info['Depth']}"
-    # out_path = os.path.join(participant_folder, f"{base_name}.csv")
-    # cleaned_df.to_csv(out_path, index=False)
-    # print(f"Cleaned data saved: {out_path}")
-
 
 
     # --- Compute PI metrics for each polarization + wavelength ---
@@ -471,6 +492,69 @@ for sess in session_folders:
 
     for json_path in json_files:
         load_and_clean_json(json_path, condition_info, mode="baseline")
+
+
+# ---------------------------------
+# DAY 4 (Experiment 2 & 3)
+# ---------------------------------
+
+def parse_day4_folder(folder_name):
+    """
+    Examples:
+      'Green Dark 0 Og. Pol'  -> Wavelength=Green, SkinTone=Dark, Orientation=0, Pol='Og. Pol'
+      'IR Fair 180 Un. Pol'   -> Wavelength=IR,    SkinTone=Fair, Orientation=180, Pol='Un. Pol'
+    """
+    parts = folder_name.split()
+    if len(parts) < 4:
+        raise ValueError(f"Day 4 folder name not parseable: {folder_name}")
+
+    wavelength = parts[0]               # Green / Red / IR
+    skin = parts[1]                     # Dark / Light / Fair (you have both Light and Fair in different days)
+    orientation = parts[2]              # 0 / 90 / 180 (string is fine)
+    pol = " ".join(parts[3:])           # 'Og. Pol' / 'Flip. Pol' / 'Un. Pol'
+
+    return wavelength, skin, orientation, pol
+
+
+day4_root = "Experiment 2 & 3 (Day 4) copy"
+
+def process_day4_experiment(exp_label):
+    exp_path = os.path.join(day4_root, exp_label)
+    if not os.path.exists(exp_path):
+        print(f"Day 4: folder not found: {exp_path}")
+        return
+
+    condition_folders = [d for d in glob.glob(os.path.join(exp_path, "*")) if os.path.isdir(d)]
+
+    for cond_folder in condition_folders:
+        folder_name = os.path.basename(cond_folder)
+
+        # Parse: Wavelength SkinTone Orientation Pol
+        wl, skin, orient, pol = parse_day4_folder(folder_name)
+
+        condition_info = {
+            "Day": "Day_4",
+            "Experiment": exp_label.replace(" ", "_"),  # 'Experiment_2' or 'Experiment_3'
+            "Wavelength": wl,
+            "SkinTone": skin,
+            "Orientation": orient,
+            "Pol": pol
+        }
+
+        # 1) unzip once
+        gz_files = glob.glob(os.path.join(cond_folder, "*.json.gz"))
+        for gz_path in gz_files:
+            unzip_file(gz_path)
+
+        # 2) process ONLY unzipped .json (ignores .json.gz)
+        json_files = glob.glob(os.path.join(cond_folder, "*.json"))
+
+        for json_path in json_files:
+            load_and_clean_json(json_path, condition_info, mode="ppg")
+
+# Run both Day 4 experiments
+process_day4_experiment("Experiment 2")
+process_day4_experiment("Experiment 3")
 
 """
 plot a good 10 second window window for each file experiment -- COMPLETE DAY 1

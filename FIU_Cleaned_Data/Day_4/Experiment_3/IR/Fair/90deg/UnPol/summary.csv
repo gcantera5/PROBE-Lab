@@ -1,0 +1,13 @@
+Participant,Channel,Hardware Channel,Metric,Mean,Std,Day,Experiment,Wavelength,SkinTone,Orientation,Pol
+IR_Fair_90_UnPol,Unpolarized_A_Green,C5,PI,-2874.3578876311544,16469.08641385244,Day_4,Experiment_3,IR,Fair,90,Un. Pol
+IR_Fair_90_UnPol,Unpolarized_A_Red,C2,PI,6.471840410729546,5.379450305899067,Day_4,Experiment_3,IR,Fair,90,Un. Pol
+IR_Fair_90_UnPol,Unpolarized_A_IR,C4,PI,2.417246206251379,1.2501303204536094,Day_4,Experiment_3,IR,Fair,90,Un. Pol
+IR_Fair_90_UnPol,Unpolarized_B_Green,C11,PI,13.361830798788835,1.8686680620638272,Day_4,Experiment_3,IR,Fair,90,Un. Pol
+IR_Fair_90_UnPol,Unpolarized_B_Red,C8,PI,3.209715789327672,0.4482166767948,Day_4,Experiment_3,IR,Fair,90,Un. Pol
+IR_Fair_90_UnPol,Unpolarized_B_IR,C10,PI,1.5375788779801967,0.23233172005164368,Day_4,Experiment_3,IR,Fair,90,Un. Pol
+IR_Fair_90_UnPol,Co-Polarized_Green,C13,PI,3.538351038615038,3.7081095918510374,Day_4,Experiment_3,IR,Fair,90,Un. Pol
+IR_Fair_90_UnPol,Co-Polarized_Red,C12,PI,4.773185260088488,10.021642100846746,Day_4,Experiment_3,IR,Fair,90,Un. Pol
+IR_Fair_90_UnPol,Co-Polarized_IR,C15,PI,1.0241584152558372,0.7341532232192973,Day_4,Experiment_3,IR,Fair,90,Un. Pol
+IR_Fair_90_UnPol,Cross-Polarized_Green,C19,PI,2.3841349891505654,1.4876647857702205,Day_4,Experiment_3,IR,Fair,90,Un. Pol
+IR_Fair_90_UnPol,Cross-Polarized_Red,C18,PI,3.6299127947654717,3.87478442706334,Day_4,Experiment_3,IR,Fair,90,Un. Pol
+IR_Fair_90_UnPol,Cross-Polarized_IR,C21,PI,1.2590712555930776,0.27223220467914816,Day_4,Experiment_3,IR,Fair,90,Un. Pol
