@@ -383,13 +383,6 @@ for json_path in json_files:
         skin = parts[1].capitalize()
         depth = parts[2] + "mm"
 
-        # condition_info = {
-        #     "SkinTone": skin,
-        #     "Speed": speed,
-        #     "Depth": depth,
-        #     "Experiment": f"Experiment_{experiment_num}"
-        # }
-
         condition_info = {
             "Day": "Day_1",
             "SkinTone": skin,
