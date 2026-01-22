@@ -9,6 +9,9 @@ import glob
 import gzip
 import shutil
 
+## add a Read me with start up details 
+# flow diagram to capture how we inout data, steps to filtering window, add to read me, explaining outputs and signal processing
+
 # ============================================================
 # CONFIG (SQI)
 # ============================================================
@@ -215,7 +218,6 @@ def process_signal(signal, fs=50, prominence=25, distance=10, label="", conditio
     Blood pulses cause less light → lower voltage,
     so the raw PPG signal is upside-down relative to blood volume.
     Flipping it restores the correct orientation where heartbeats appear as upward peaks.
-
 
     """
     locs_troughs, _ = find_peaks(-isolated, prominence=prominence, distance=distance)
@@ -611,6 +613,7 @@ def process_day4_experiment(exp_label):
 # Run both Day 4 experiments
 process_day4_experiment("Experiment 2")
 process_day4_experiment("Experiment 3")
+
 
 
 """
