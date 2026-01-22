@@ -2,11 +2,23 @@ import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import butter, filtfilt, find_peaks
+from scipy.signal import butter, filtfilt, find_peaks, detrend  
+from scipy.stats import skew    
 import os
 import glob
 import gzip
 import shutil
+
+# ============================================================
+# CONFIG (SQI)
+# ============================================================
+FS = 50                   # sampling frequency (Hz)
+SQI_WINDOW_SEC = 8        # configurable 5–10 sec window
+SQI_STEP_SEC = 1          # required 1 sec stride
+BP_LOW_HZ = 0.5           # bandpass low cutoff
+BP_HIGH_HZ = 8.0          # bandpass high cutoff
+BP_ORDER = 4              # 4th order bandpass
+
 
 # ---------------------------------
 # CHANNEL MAP 
@@ -33,10 +45,88 @@ def unzip_file(filepath):
         return new_path
     return filepath
 
-def lowpass_filter(signal, cutoff_hz, fs, order=4):
-    """Zero-phase low-pass filter to remove high-frequency noise."""
-    b, a = butter(order, cutoff_hz / (fs / 2), btype="low")
+# def lowpass_filter(signal, cutoff_hz, fs, order=4):
+#     """Zero-phase low-pass filter to remove high-frequency noise."""
+#     b, a = butter(order, cutoff_hz / (fs / 2), btype="low")
+#     return filtfilt(b, a, signal)
+
+# ---------------------------------
+# FILTERING bandpass instead of lowpass)
+# ---------------------------------
+def bandpass_filter(signal, low_hz, high_hz, fs, order=4):
+    """
+    4th-order Butterworth bandpass filter (0.5–8 Hz), zero-phase.
+    """
+    signal = np.asarray(signal, dtype=float)
+    nyq = fs / 2.0
+    low = low_hz / nyq
+    high = high_hz / nyq
+    b, a = butter(order, [low, high], btype="bandpass")
     return filtfilt(b, a, signal)
+
+
+# ---------------------------------
+# WINDOWING + PREPROCESSING (NEW for SQI)
+# ---------------------------------
+def iter_windows(x, fs, window_sec=8, step_sec=1):
+    """
+    Sliding windows (5–10 sec) with 1-sec stride.
+    Yields: (start_idx, end_idx, window_data)
+    """
+    x = np.asarray(x, dtype=float)
+    win = int(window_sec * fs)
+    step = int(step_sec * fs)
+
+    if win <= 0 or step <= 0:
+        raise ValueError("window_sec and step_sec must be > 0")
+
+    if len(x) < win:
+        return
+
+    for start in range(0, len(x) - win + 1, step):
+        end = start + win
+        yield start, end, x[start:end]
+
+
+def preprocess_window_ppg(win, fs, low_hz=0.5, high_hz=8.0, order=4):
+    """
+      1) bandpass filter
+      2) zero-center (subtract DC per window)
+      3) detrend each window
+    """
+    filtered = bandpass_filter(win, low_hz, high_hz, fs, order=order)
+    centered = filtered - np.nanmean(filtered)         # zero-center (DC removal)
+    detr = detrend(centered, type="linear")            # detrend each window
+    return detr
+
+def compute_sqi_windows(signal, condition_info, label, fs=50,
+                        window_sec=8, step_sec=1,
+                        low_hz=0.5, high_hz=8.0, order=4):
+    """
+    Compute SQI stats per window (includes Skewness).
+    Returns a DataFrame (one row per window).
+    """
+    rows = []
+    for start, end, win in iter_windows(signal, fs, window_sec, step_sec):
+        proc = preprocess_window_ppg(win, fs, low_hz, high_hz, order)
+
+        rows.append({
+            "Channel": label,
+            "Hardware Channel": channel_name_map(label),
+            "WindowStartIdx": start,
+            "WindowEndIdx": end,
+            "WindowStartSec": start / fs,
+            "WindowEndSec": end / fs,
+            "Mean": float(np.nanmean(proc)),
+            "Std": float(np.nanstd(proc)),
+            "Skewness": float(skew(proc, nan_policy="omit")),
+            **(condition_info if condition_info else {})
+        })
+    return pd.DataFrame(rows)
+
+# ---------------------------------
+# METRICS
+# ---------------------------------
 
 def compute_PI(peaks, troughs):
     """Compute perfusion index (AC/DC)*100, sign-corrected."""
@@ -57,9 +147,11 @@ def channel_name_map(clean_col_name):
                 return ch.upper()
     return "N/A"
 
-def process_signal(signal, fs=50, cutoff=5, prominence=25, distance=10, label="", condition_info=None):
+def process_signal(signal, fs=50, prominence=25, distance=10, label="", condition_info=None):
     """Filter, detect peaks/troughs, compute PI mean/std."""
-    isolated = lowpass_filter(signal, cutoff, fs)
+    #isolated = lowpass_filter(signal, cutoff, fs)
+
+    isolated = bandpass_filter(signal, BP_LOW_HZ, BP_HIGH_HZ, fs, order=BP_ORDER)
 
     # Extract just the channel (e.g. C5, C10)
     graph_channel = "N/A"
@@ -70,23 +162,6 @@ def process_signal(signal, fs=50, cutoff=5, prominence=25, distance=10, label=""
 
 
     # # --- VISUALIZE THE FILTERED PPG SIGNAL ---
-
-
-    # if condition_info:
-    #     full_label = f"{condition_info['SkinTone']} | {condition_info['Experiment']} | {condition_info['Speed']} | {condition_info['Depth']} | {graph_channel}"
-
-    # Extract hardware channel (ex: C5)
-
-    # channel_num = label.split("_")[-1].upper()
-
-    # full_label = (
-    #     f"{condition_info['SkinTone']} | "
-    #     f"{condition_info['Day']} | "
-    #     f"{condition_info['Experiment']} | "
-    #     f"{condition_info['Speed']} | "
-    #     f"{condition_info['Depth']} | "
-    #     f"{graph_channel}"
-    # )
 
     parts = [
         condition_info.get("SkinTone") if condition_info else None,
@@ -103,12 +178,6 @@ def process_signal(signal, fs=50, cutoff=5, prominence=25, distance=10, label=""
 
     full_label = " | ".join([p for p in parts if p])
 
-    # Create plot folder
-    # plot_dir = os.path.join(
-    #     "FIU_Plots",
-    #     condition_info["Day"],
-    #     condition_info["Experiment"]
-    # )
     plot_dir = os.path.join(
         "FIU_Plots",
         condition_info["Day"],
@@ -220,12 +289,6 @@ def load_and_clean_json(json_path, condition_info, mode="ppg"):
         condition = condition_info.get("Condition", "Calibration")
         participant_folder = os.path.join("FIU_Cleaned_Data", "Day_3", "Calibration", condition)
         base_name = condition
-
-    # if condition_info.get("Day") == "Day_3":
-    #     condition = condition_info.get("Condition", "Calibration")
-    #     condition = condition.strip().replace(" ", "_")
-    #     participant_folder = os.path.join("FIU_Cleaned_Data", "Day_3", "Calibration", condition)
-    #     base_name = condition  # keep name simple for blackout
 
     elif day == "Day_4":
         # Day 4 (Experiment 2 & 3) metadata comes from folder names, not Speed/Depth
@@ -549,8 +612,10 @@ def process_day4_experiment(exp_label):
 process_day4_experiment("Experiment 2")
 process_day4_experiment("Experiment 3")
 
+
 """
 plot a good 10 second window window for each file experiment -- COMPLETE DAY 1
+
 make sure the graohs are inverted -- exoect notch to be on the right
 
 find the skweness of a signal
@@ -562,11 +627,11 @@ want to define morphalogy of the signal with skweness
 
 based on skweness well know if we have a good signial if we have a pos skewness
 
+_______________________________________________________________________________________
 
 apply notch filter -- will help with viewing graphs
 
 label trial instead of experiment 1 or 2
-
 
 get peak and troughs for each subsequent experiment per day
 
