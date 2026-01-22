@@ -551,6 +551,17 @@ process_day4_experiment("Experiment 3")
 
 """
 plot a good 10 second window window for each file experiment -- COMPLETE DAY 1
+make sure the graohs are inverted -- exoect notch to be on the right
+
+find the skweness of a signal
+
+want to have windowing in our signal, windowing will allow us to define where ppg signal is good enoguh to calculate prefusion index
+
+tell us wherether we should include that part in the signal to include in the mean or not.
+want to define morphalogy of the signal with skweness
+
+based on skweness well know if we have a good signial if we have a pos skewness
+
 
 apply notch filter -- will help with viewing graphs
 
