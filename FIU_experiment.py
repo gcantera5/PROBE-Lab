@@ -16,7 +16,7 @@ import shutil
 # CONFIG (SQI)
 # ============================================================
 FS = 50                   # sampling frequency (Hz)
-SQI_WINDOW_SEC = 8        # configurable 5–10 sec window
+SQI_WINDOW_SEC = 10       # configurable 5–10 sec window
 SQI_STEP_SEC = 1          # required 1 sec stride
 BP_LOW_HZ = 0.5           # bandpass low cutoff
 BP_HIGH_HZ = 8.0          # bandpass high cutoff
@@ -76,12 +76,12 @@ def iter_windows(x, fs, window_sec=8, step_sec=1):
     Sliding windows (5–10 sec) with 1-sec stride.
     Yields: (start_idx, end_idx, window_data)
     """
+    if not (5 <= window_sec <= 10):
+        raise ValueError("window_sec must be between 5 and 10 seconds")
+
     x = np.asarray(x, dtype=float)
     win = int(window_sec * fs)
     step = int(step_sec * fs)
-
-    if win <= 0 or step <= 0:
-        raise ValueError("window_sec and step_sec must be > 0")
 
     if len(x) < win:
         return
@@ -97,21 +97,31 @@ def preprocess_window_ppg(win, fs, low_hz=0.5, high_hz=8.0, order=4):
       2) zero-center (subtract DC per window)
       3) detrend each window
     """
+    win = np.asarray(win, dtype=float)
+
     filtered = bandpass_filter(win, low_hz, high_hz, fs, order=order)
-    centered = filtered - np.nanmean(filtered)         # zero-center (DC removal)
-    detr = detrend(centered, type="linear")            # detrend each window
-    return detr
+
+    # subtract DC component per window
+    centered = filtered - np.nanmean(filtered)
+    centered = np.nan_to_num(centered, nan=0.0)
+
+    # detrend per window
+    proc = detrend(centered, type="linear")
+    return proc
 
 def compute_sqi_windows(signal, condition_info, label, fs=50,
-                        window_sec=8, step_sec=1,
+                        window_sec=10, step_sec=1,
                         low_hz=0.5, high_hz=8.0, order=4):
     """
     Compute SQI stats per window (includes Skewness).
     Returns a DataFrame (one row per window).
     """
     rows = []
+
     for start, end, win in iter_windows(signal, fs, window_sec, step_sec):
         proc = preprocess_window_ppg(win, fs, low_hz, high_hz, order)
+        if proc is None:
+            continue
 
         rows.append({
             "Channel": label,
@@ -120,12 +130,104 @@ def compute_sqi_windows(signal, condition_info, label, fs=50,
             "WindowEndIdx": end,
             "WindowStartSec": start / fs,
             "WindowEndSec": end / fs,
-            "Mean": float(np.nanmean(proc)),
-            "Std": float(np.nanstd(proc)),
-            "Skewness": float(skew(proc, nan_policy="omit")),
+            "Mean": float(np.mean(proc)),
+            "Std": float(np.std(proc)),
+            "Skewness": float(skew(proc)),
             **(condition_info if condition_info else {})
         })
+
     return pd.DataFrame(rows)
+
+
+
+def pick_best_window(sqi_df, min_std=0.02):
+    """
+    Choose a "good" window using SQI.
+      - Good signal should have positive skewness
+      - Avoid flat windows using Std threshold
+    """
+    if sqi_df is None or len(sqi_df) == 0:
+        return None
+
+    valid = sqi_df[(sqi_df["Std"] >= min_std) & (sqi_df["Skewness"] > 0)]
+    if len(valid) == 0:
+        # fallback: choose the window with highest Std
+        return sqi_df.sort_values("Std", ascending=False).iloc[0]
+
+    return valid.sort_values("Skewness", ascending=False).iloc[0]
+
+
+def plot_best_window(signal, fs, condition_info, label,
+                     window_sec=10, step_sec=1,
+                     low_hz=0.5, high_hz=8.0, order=4,
+                     min_std=0.02):
+    """
+    Create and save a plot of the best 10s window (processed).
+    Overwrites existing file if same name
+    """
+    sqi_df = compute_sqi_windows(signal, condition_info, label, fs,
+                                 window_sec=window_sec, step_sec=step_sec,
+                                 low_hz=low_hz, high_hz=high_hz, order=order)
+
+    best = pick_best_window(sqi_df, min_std=min_std)
+    if best is None:
+        return sqi_df, None
+
+    start = int(best["WindowStartIdx"])
+    end = int(best["WindowEndIdx"])
+    win = np.asarray(signal[start:end], dtype=float)
+
+    proc = preprocess_window_ppg(win, fs, low_hz, high_hz, order)
+    if proc is None:
+        return sqi_df, None
+
+    # Label building (keeps your style)
+    graph_channel = channel_name_map(label)
+    parts = [
+        condition_info.get("SkinTone") if condition_info else None,
+        condition_info.get("Day") if condition_info else None,
+        condition_info.get("Experiment") if condition_info else None,
+        condition_info.get("Speed") if condition_info else None,
+        condition_info.get("Depth") if condition_info else None,
+        condition_info.get("Wavelength") if condition_info else None,
+        condition_info.get("Pol") if condition_info else None,
+        condition_info.get("Session") if condition_info else None,
+        condition_info.get("Condition") if condition_info else None,
+        label,
+        graph_channel
+    ]
+    full_label = " | ".join([p for p in parts if p])
+
+    # folder for best-window plots
+    plot_dir = os.path.join(
+        "FIU_Plots",
+        condition_info.get("Day", "UnknownDay"),
+        condition_info.get("Experiment", condition_info.get("Condition", "UnknownCondition")),
+        "BestWindow"
+    )
+    os.makedirs(plot_dir, exist_ok=True)
+
+    plot_name = full_label.replace(" | ", "_").replace(" ", "").replace(".", "")
+    plot_path = os.path.join(plot_dir, f"{plot_name}_bestwindow.png")
+
+    t = np.arange(len(proc)) / fs
+
+    plt.figure(figsize=(9, 4))
+    plt.plot(t, proc, linewidth=1.2)
+    plt.title(
+        f"{full_label}\n"
+        f"Best {window_sec}s window: {best['WindowStartSec']:.1f}-{best['WindowEndSec']:.1f}s | "
+        f"Skew={best['Skewness']:.3f}, Std={best['Std']:.3f}"
+    )
+    plt.xlabel("Time (s)")
+    plt.ylabel("PPG (bandpass + centered + detrended)")  
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(plot_path, dpi=300)
+    plt.close()
+
+    return sqi_df, plot_path
+
 
 # ---------------------------------
 # METRICS
@@ -150,59 +252,64 @@ def channel_name_map(clean_col_name):
                 return ch.upper()
     return "N/A"
 
-def process_signal(signal, fs=50, prominence=25, distance=10, label="", condition_info=None):
-    """Filter, detect peaks/troughs, compute PI mean/std."""
+def process_signal(signal, fs=50, prominence=25, distance=10,
+                            label="", condition_info=None,
+                            window_sec=10, step_sec=1):
+    """
+    Filter, detect peaks/troughs, compute PI mean/std.
+    Only compute PI where PPG looks good
+    """
     #isolated = lowpass_filter(signal, cutoff, fs)
 
-    isolated = bandpass_filter(signal, BP_LOW_HZ, BP_HIGH_HZ, fs, order=BP_ORDER)
+    # isolated = bandpass_filter(signal, BP_LOW_HZ, BP_HIGH_HZ, fs, order=BP_ORDER)
 
-    # Extract just the channel (e.g. C5, C10)
-    graph_channel = "N/A"
-    for pol, mapping in CHANNEL_MAP.items():
-        for color, ch in mapping.items():
-            if f"{pol}_{color}" == label:
-                graph_channel = ch.upper()
+    # # Extract just the channel (e.g. C5, C10)
+    # graph_channel = "N/A"
+    # for pol, mapping in CHANNEL_MAP.items():
+    #     for color, ch in mapping.items():
+    #         if f"{pol}_{color}" == label:
+    #             graph_channel = ch.upper()
 
 
-    # # --- VISUALIZE THE FILTERED PPG SIGNAL ---
+    # # # --- VISUALIZE THE FILTERED PPG SIGNAL ---
 
-    parts = [
-        condition_info.get("SkinTone") if condition_info else None,
-        condition_info.get("Day") if condition_info else None,
-        condition_info.get("Experiment") if condition_info else None,
-        condition_info.get("Speed") if condition_info else None,
-        condition_info.get("Depth") if condition_info else None,
-        condition_info.get("Wavelength") if condition_info else None,
-        condition_info.get("PolCondition") if condition_info else None,
-        condition_info.get("Session") if condition_info else None,
-        condition_info.get("Condition") if condition_info else None,
-        graph_channel
-    ]
+    # parts = [
+    #     condition_info.get("SkinTone") if condition_info else None,
+    #     condition_info.get("Day") if condition_info else None,
+    #     condition_info.get("Experiment") if condition_info else None,
+    #     condition_info.get("Speed") if condition_info else None,
+    #     condition_info.get("Depth") if condition_info else None,
+    #     condition_info.get("Wavelength") if condition_info else None,
+    #     condition_info.get("PolCondition") if condition_info else None,
+    #     condition_info.get("Session") if condition_info else None,
+    #     condition_info.get("Condition") if condition_info else None,
+    #     graph_channel
+    # ]
 
-    full_label = " | ".join([p for p in parts if p])
+    # full_label = " | ".join([p for p in parts if p])
 
-    plot_dir = os.path.join(
-        "FIU_Plots",
-        condition_info["Day"],
-        condition_info.get("Experiment", condition_info.get("Condition"))
-    )
+    # plot_dir = os.path.join(
+    #     "FIU_Plots",
+    #     condition_info["Day"],
+    #     condition_info.get("Experiment", condition_info.get("Condition"))
+    # )
 
-    os.makedirs(plot_dir, exist_ok=True)
+    # os.makedirs(plot_dir, exist_ok=True)
 
-    # Safe filename
-    plot_name = full_label.replace(" | ", "_").replace(" ", "")
-    plot_path = os.path.join(plot_dir, f"{plot_name}.png")
+    # # Safe filename
+    # plot_name = full_label.replace(" | ", "_").replace(" ", "")
+    # plot_path = os.path.join(plot_dir, f"{plot_name}.png")
 
-    # Save plot (do NOT show)
-    plt.figure(figsize=(8, 4))
-    plt.plot(isolated, color="#7289A7", linewidth=1.2)
-    plt.title(full_label)
-    plt.xlabel("Sample index")
-    plt.ylabel("Filtered amplitude")
-    plt.grid(True, linestyle="--", alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(plot_path, dpi=300)
-    plt.close()
+    # # Save plot (do NOT show)
+    # plt.figure(figsize=(8, 4))
+    # plt.plot(isolated, color="#7289A7", linewidth=1.2)
+    # plt.title(full_label)
+    # plt.xlabel("Sample index")
+    # plt.ylabel("Filtered amplitude")
+    # plt.grid(True, linestyle="--", alpha=0.5)
+    # plt.tight_layout()
+    # plt.savefig(plot_path, dpi=300)
+    # plt.close()
 
     """
     The PPG signal was inverted along the y-axis because photodiodes produce 
@@ -220,6 +327,27 @@ def process_signal(signal, fs=50, prominence=25, distance=10, label="", conditio
     Flipping it restores the correct orientation where heartbeats appear as upward peaks.
 
     """
+    sqi_df = compute_sqi_windows(
+        signal, condition_info, label, fs,
+        window_sec=window_sec, step_sec=step_sec,
+        low_hz=BP_LOW_HZ, high_hz=BP_HIGH_HZ, order=BP_ORDER
+    )
+
+    best = pick_best_window(sqi_df, min_std=0.02)
+    if best is None:
+        return np.nan, np.nan
+
+    start = int(best["WindowStartIdx"])
+    end = int(best["WindowEndIdx"])
+    win = np.asarray(signal[start:end], dtype=float)
+
+    isolated = preprocess_window_ppg(win, fs, BP_LOW_HZ, BP_HIGH_HZ, order=BP_ORDER)
+    if isolated is None:
+        return np.nan, np.nan
+
+    # invert so we have systolic peaks upward
+    # isolated = -isolated
+
     locs_troughs, _ = find_peaks(-isolated, prominence=prominence, distance=distance)
     locs_peaks, _ = find_peaks(isolated, prominence=prominence, distance=distance)
 
@@ -228,8 +356,7 @@ def process_signal(signal, fs=50, prominence=25, distance=10, label="", conditio
     min_len = min(len(peaks), len(troughs))
 
     if min_len == 0:
-        return np.nan, np.nan  # no valid peaks/troughs
-
+        return np.nan, np.nan
 
     PI = compute_PI(peaks[:min_len], troughs[:min_len])
     return np.mean(PI), np.std(PI)
@@ -322,13 +449,20 @@ def load_and_clean_json(json_path, condition_info, mode="ppg"):
     # --------------------------------------------------
     # SKIP if this file was already processed
     # --------------------------------------------------
-    if os.path.exists(out_path):
-        print(f"Skipping (already cleaned): {out_path}")
-        return
+    # if os.path.exists(out_path):
+    #     print(f"Skipping (already cleaned): {out_path}")
+    #     return
 
-    #out_path = os.path.join(participant_folder, f"{base_name}.csv")
-    cleaned_df.to_csv(out_path, index=False)
-    print(f"Cleaned data saved: {out_path}")
+    # #out_path = os.path.join(participant_folder, f"{base_name}.csv")
+    # cleaned_df.to_csv(out_path, index=False)
+    # print(f"Cleaned data saved: {out_path}")
+
+    if os.path.exists(out_path):
+        print(f"Already cleaned, loading: {out_path}")
+        cleaned_df = pd.read_csv(out_path)
+    else:
+        cleaned_df.to_csv(out_path, index=False)
+        print(f"Cleaned data saved: {out_path}")
 
 
     # --- Compute PI metrics for each polarization + wavelength ---
@@ -352,7 +486,62 @@ def load_and_clean_json(json_path, condition_info, mode="ppg"):
                     **condition_info
                 })
             else:
-                mean_PI, std_PI = process_signal(cleaned_df[col].values, fs, label=col, condition_info=condition_info)
+                sqi_df = compute_sqi_windows(
+                cleaned_df[col].values,
+                condition_info,
+                label=col,
+                fs=FS,
+                window_sec=SQI_WINDOW_SEC,
+                step_sec=SQI_STEP_SEC,
+                low_hz=BP_LOW_HZ,
+                high_hz=BP_HIGH_HZ,
+                order=BP_ORDER
+            )
+
+                sqi_path = os.path.join(participant_folder, "sqi.csv")
+
+                if len(sqi_df) > 0:
+                    if os.path.exists(sqi_path):
+                        existing_sqi = pd.read_csv(sqi_path)
+                        existing_sqi = existing_sqi[existing_sqi["Channel"] != col]
+                        sqi_df_out = pd.concat([existing_sqi, sqi_df], ignore_index=True)
+                    else:
+                        sqi_df_out = sqi_df.copy()
+
+                    sqi_df_out.to_csv(sqi_path, index=False)
+                    print(f"SQI saved/updated: {sqi_path}")
+
+                # ============================================================
+                # Plot best 10-second window
+                # ============================================================
+                _, best_plot_path = plot_best_window(
+                    cleaned_df[col].values,
+                    fs=FS,
+                    condition_info=condition_info,
+                    label=col,
+                    window_sec=SQI_WINDOW_SEC,
+                    step_sec=SQI_STEP_SEC,
+                    low_hz=BP_LOW_HZ,
+                    high_hz=BP_HIGH_HZ,
+                    order=BP_ORDER,
+                    min_std=0.02
+                )
+
+                if best_plot_path:
+                    print(f"Best-window plot saved: {best_plot_path}")
+
+                # ============================================================
+                # PI computed only from best SQI window
+                # ============================================================
+                mean_PI, std_PI = process_signal(
+                    cleaned_df[col].values,
+                    fs=FS,
+                    label=col,
+                    condition_info=condition_info,
+                    window_sec=SQI_WINDOW_SEC,
+                    step_sec=SQI_STEP_SEC
+                )
+
                 summary_rows.append({
                     "Participant": base_name,
                     "Channel": col,
@@ -362,6 +551,7 @@ def load_and_clean_json(json_path, condition_info, mode="ppg"):
                     "Std": std_PI,
                     **condition_info
                 })
+            
 
 
     summary_df = pd.DataFrame(summary_rows)
@@ -631,13 +821,5 @@ want to define morphalogy of the signal with skweness
 based on skweness well know if we have a good signial if we have a pos skewness
 
 _______________________________________________________________________________________
-
-apply notch filter -- will help with viewing graphs
-
-label trial instead of experiment 1 or 2
-
-get peak and troughs for each subsequent experiment per day
-
-Rutendo -- fft code implementation
 
 """
