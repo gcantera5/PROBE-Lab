@@ -181,6 +181,8 @@ def plot_best_window(signal, fs, condition_info, label,
     if proc is None:
         return sqi_df, None
 
+    proc = -proc
+
     # Label building (keeps your style)
     graph_channel = channel_name_map(label)
     parts = [
@@ -346,7 +348,7 @@ def process_signal(signal, fs=50, prominence=25, distance=10,
         return np.nan, np.nan
 
     # invert so we have systolic peaks upward
-    # isolated = -isolated
+    #isolated = -isolated
 
     locs_troughs, _ = find_peaks(-isolated, prominence=prominence, distance=distance)
     locs_peaks, _ = find_peaks(isolated, prominence=prominence, distance=distance)
