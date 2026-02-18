@@ -15,7 +15,7 @@ import shutil
 # ============================================================
 # CONFIG (SQI)
 # ============================================================
-FS = 50                   # sampling frequency (Hz)
+FS = 25                   # sampling frequency (Hz)
 SQI_WINDOW_SEC = 10       # configurable 5–10 sec window
 SQI_STEP_SEC = 1          # required 1 sec stride
 BP_LOW_HZ = 0.5           # bandpass low cutoff
@@ -109,7 +109,7 @@ def preprocess_window_ppg(win, fs, low_hz=0.5, high_hz=8.0, order=4):
     proc = detrend(centered, type="linear")
     return proc
 
-def compute_sqi_windows(signal, condition_info, label, fs=50,
+def compute_sqi_windows(signal, condition_info, label, fs=25,
                         window_sec=10, step_sec=1,
                         low_hz=0.5, high_hz=8.0, order=4):
     """
@@ -324,11 +324,12 @@ def channel_name_map(clean_col_name):
                 return ch.upper()
     return "N/A"
 
-def process_signal(signal, fs=50, prominence=25, distance=10,
+def process_signal(signal, fs=25, prominence=25, distance=int(0.3 * FS),
                             label="", condition_info=None,
                             window_sec=10, step_sec=1):
+
     """
-    Filter, detect peaks/troughs, compute PI mean/std.
+    Filter, detect peaks/troughs, compute PI mean/std
     Only compute PI where PPG looks good
     """
 
@@ -488,7 +489,7 @@ def load_and_clean_json(json_path, condition_info, mode="ppg"):
 
     # --- Compute PI metrics for each polarization + wavelength ---
     summary_rows = []
-    fs = 50  # sampling frequency (Hz)
+    fs = 25  # sampling frequency (Hz)
 
     for col in cleaned_df.columns:
         if any(pol in col for pol in ["Unpolarized_A", "Unpolarized_B", "Co-Polarized", "Cross-Polarized"]):
