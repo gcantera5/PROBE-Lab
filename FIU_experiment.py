@@ -230,6 +230,76 @@ def plot_best_window(signal, fs, condition_info, label,
 
     return sqi_df, plot_path
 
+# ============================================================
+# Save "original" full-length plots
+# ============================================================
+def plot_original_signal(signal, fs, condition_info, label,
+                         save_filtered=True,
+                         low_hz=BP_LOW_HZ, high_hz=BP_HIGH_HZ, order=BP_ORDER):
+    """
+    Save the full-length signal plot into:
+      FIU_Plots/<Day>/<Experiment or Condition>/OriginalGraphs/
+
+    If save_filtered=True, we bandpass filter ONLY (no windowing, no detrend per window)
+    so you can compare against BestWindow plots.
+    """
+    x = np.asarray(signal, dtype=float)
+
+    # Optionally apply bandpass to make the "original" plot easier to interpret
+    if save_filtered:
+        try:
+            x_plot = bandpass_filter(x, low_hz, high_hz, fs, order=order)
+            ylab = "PPG (bandpass only)"
+        except Exception:
+            x_plot = x
+            ylab = "PPG (raw)"
+    else:
+        x_plot = x
+        ylab = "PPG (raw)"
+
+    # ✅ Keep your label style
+    graph_channel = channel_name_map(label)
+    parts = [
+        condition_info.get("SkinTone") if condition_info else None,
+        condition_info.get("Day") if condition_info else None,
+        condition_info.get("Experiment") if condition_info else None,
+        condition_info.get("Speed") if condition_info else None,
+        condition_info.get("Depth") if condition_info else None,
+        condition_info.get("Wavelength") if condition_info else None,
+        condition_info.get("Pol") if condition_info else None,
+        condition_info.get("Session") if condition_info else None,
+        condition_info.get("Condition") if condition_info else None,
+        label,
+        graph_channel
+    ]
+    full_label = " | ".join([p for p in parts if p])
+
+    # ✅ Folder parallel to BestWindow
+    plot_dir = os.path.join(
+        "FIU_Plots",
+        condition_info.get("Day", "UnknownDay"),
+        condition_info.get("Experiment", condition_info.get("Condition", "UnknownCondition")),
+        "OriginalGraphs"
+    )
+    os.makedirs(plot_dir, exist_ok=True)
+
+    plot_name = full_label.replace(" | ", "_").replace(" ", "").replace(".", "")
+    plot_path = os.path.join(plot_dir, f"{plot_name}_original.png")
+
+    t = np.arange(len(x_plot)) / fs
+
+    plt.figure(figsize=(10, 4))
+    plt.plot(t, x_plot, linewidth=1.0)
+    plt.title(full_label + "\nFull-length signal")
+    plt.xlabel("Time (s)")
+    plt.ylabel(ylab)
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(plot_path, dpi=300)   # overwrites if same name
+    plt.close()
+
+    return plot_path
+
 
 # ---------------------------------
 # METRICS
@@ -261,57 +331,6 @@ def process_signal(signal, fs=50, prominence=25, distance=10,
     Filter, detect peaks/troughs, compute PI mean/std.
     Only compute PI where PPG looks good
     """
-    #isolated = lowpass_filter(signal, cutoff, fs)
-
-    # isolated = bandpass_filter(signal, BP_LOW_HZ, BP_HIGH_HZ, fs, order=BP_ORDER)
-
-    # # Extract just the channel (e.g. C5, C10)
-    # graph_channel = "N/A"
-    # for pol, mapping in CHANNEL_MAP.items():
-    #     for color, ch in mapping.items():
-    #         if f"{pol}_{color}" == label:
-    #             graph_channel = ch.upper()
-
-
-    # # # --- VISUALIZE THE FILTERED PPG SIGNAL ---
-
-    # parts = [
-    #     condition_info.get("SkinTone") if condition_info else None,
-    #     condition_info.get("Day") if condition_info else None,
-    #     condition_info.get("Experiment") if condition_info else None,
-    #     condition_info.get("Speed") if condition_info else None,
-    #     condition_info.get("Depth") if condition_info else None,
-    #     condition_info.get("Wavelength") if condition_info else None,
-    #     condition_info.get("PolCondition") if condition_info else None,
-    #     condition_info.get("Session") if condition_info else None,
-    #     condition_info.get("Condition") if condition_info else None,
-    #     graph_channel
-    # ]
-
-    # full_label = " | ".join([p for p in parts if p])
-
-    # plot_dir = os.path.join(
-    #     "FIU_Plots",
-    #     condition_info["Day"],
-    #     condition_info.get("Experiment", condition_info.get("Condition"))
-    # )
-
-    # os.makedirs(plot_dir, exist_ok=True)
-
-    # # Safe filename
-    # plot_name = full_label.replace(" | ", "_").replace(" ", "")
-    # plot_path = os.path.join(plot_dir, f"{plot_name}.png")
-
-    # # Save plot (do NOT show)
-    # plt.figure(figsize=(8, 4))
-    # plt.plot(isolated, color="#7289A7", linewidth=1.2)
-    # plt.title(full_label)
-    # plt.xlabel("Sample index")
-    # plt.ylabel("Filtered amplitude")
-    # plt.grid(True, linestyle="--", alpha=0.5)
-    # plt.tight_layout()
-    # plt.savefig(plot_path, dpi=300)
-    # plt.close()
 
     """
     The PPG signal was inverted along the y-axis because photodiodes produce 
@@ -488,17 +507,26 @@ def load_and_clean_json(json_path, condition_info, mode="ppg"):
                     **condition_info
                 })
             else:
+                orig_plot_path = plot_original_signal(
+                    cleaned_df[col].values,
+                    fs=FS,
+                    condition_info=condition_info,
+                    label=col,
+                    save_filtered=True   # set False if you want truly raw
+                )
+                print(f"Original plot saved: {orig_plot_path}")
+
                 sqi_df = compute_sqi_windows(
-                cleaned_df[col].values,
-                condition_info,
-                label=col,
-                fs=FS,
-                window_sec=SQI_WINDOW_SEC,
-                step_sec=SQI_STEP_SEC,
-                low_hz=BP_LOW_HZ,
-                high_hz=BP_HIGH_HZ,
-                order=BP_ORDER
-            )
+                                                cleaned_df[col].values,
+                                                condition_info,
+                                                label=col,
+                                                fs=FS,
+                                                window_sec=SQI_WINDOW_SEC,
+                                                step_sec=SQI_STEP_SEC,
+                                                low_hz=BP_LOW_HZ,
+                                                high_hz=BP_HIGH_HZ,
+                                                order=BP_ORDER
+                                            )
 
                 sqi_path = os.path.join(participant_folder, "sqi.csv")
 
