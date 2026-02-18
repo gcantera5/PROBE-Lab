@@ -183,7 +183,7 @@ def plot_best_window(signal, fs, condition_info, label,
 
     proc = -proc
 
-    # Label building (keeps your style)
+    # Label building 
     graph_channel = channel_name_map(label)
     parts = [
         condition_info.get("SkinTone") if condition_info else None,
@@ -257,7 +257,6 @@ def plot_original_signal(signal, fs, condition_info, label,
         x_plot = x
         ylab = "PPG (raw)"
 
-    # ✅ Keep your label style
     graph_channel = channel_name_map(label)
     parts = [
         condition_info.get("SkinTone") if condition_info else None,
@@ -274,7 +273,6 @@ def plot_original_signal(signal, fs, condition_info, label,
     ]
     full_label = " | ".join([p for p in parts if p])
 
-    # ✅ Folder parallel to BestWindow
     plot_dir = os.path.join(
         "FIU_Plots",
         condition_info.get("Day", "UnknownDay"),
