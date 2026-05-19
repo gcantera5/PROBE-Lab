@@ -1,0 +1,5 @@
+ts,user_id,device_id,data.batt_mv,data.connected,data.firmware_version,data.state,time_s
+2026-03-13 16:59:21.024357+00:00,0,0,4034.0,,,,0.0
+2026-03-13 16:59:51.026255+00:00,0,0,4026.0,,,,30.001898
+2026-03-13 16:59:54.281418+00:00,0,0,,True,v4.0.5,"Active Data Collection
+(1 1 1)",33.257061
