@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 INPUT_FILE = Path("trial1.json")
 
 # This is where all of the cleaned CSVs + plots will go
-OUTPUT_DIR = Path("cleaned_trial1")
+OUTPUT_DIR = Path("Cleaned Trial1 Data Folder")
 
 # These are the channels we care most about right now
 # You can change these later depending on what LEDs/polarizations you want
